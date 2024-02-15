@@ -2,6 +2,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Profile, Strategy } from 'passport-kakao';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
+import { ISocialUser, Social } from '../interfaces/social-user.interface';
 
 export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
   private readonly logger = new Logger(KakaoStrategy.name);
@@ -19,17 +20,12 @@ export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
     profile: Profile,
     done,
   ) {
-    const profileJson = profile._json;
-    const kakaoId = profileJson.id;
     try {
-      const user: {
-        accessToken: string;
-        kakaoId: string;
-        refreshToken: string;
-      } = {
-        accessToken,
-        refreshToken,
-        kakaoId,
+      const user: ISocialUser = {
+        nickname: profile.displayName,
+        username: profile._json.kakao_account.email,
+        password: profile.id,
+        social: Social.KAKAO,
       };
 
       done(null, user);

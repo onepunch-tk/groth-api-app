@@ -1,10 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { KakaoStrategy } from './strategies/kakao.strategy';
+import { AuthService } from './auth.service';
+import { MongooseModule } from '@nestjs/mongoose';
+import { User, UserSchema } from './schemas/user.schema';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+  ],
   controllers: [AuthController],
   providers: [
     {
@@ -14,6 +19,7 @@ import { KakaoStrategy } from './strategies/kakao.strategy';
       },
       inject: [ConfigService],
     },
+    AuthService,
   ],
 })
 export class AuthModule {}
