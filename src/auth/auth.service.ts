@@ -84,7 +84,7 @@ export class AuthService {
     const payload = { username, id };
     return {
       accessToken: this.jwtService.sign(payload),
-      refreshToken: this.jwtService.sign(payload, { expiresIn: '2m' }), // refreshToken 만료 시간 설정
+      refreshToken: this.jwtService.sign(payload, { expiresIn: '7d' }), // refreshToken 만료 시간 설정
     };
   }
 }
