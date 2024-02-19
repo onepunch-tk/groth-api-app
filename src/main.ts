@@ -20,7 +20,6 @@ async function bootstrap() {
   await app.register(fastifyCookie, {
     secret,
   });
-
   await app.listen(3000);
 }
 bootstrap();
