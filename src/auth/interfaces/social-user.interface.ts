@@ -1,3 +1,5 @@
+import { Types } from 'mongoose';
+
 export enum Social {
   KAKAO = 'KAKAO',
   GOOGLE = 'GOOGLE',
@@ -10,6 +12,7 @@ export enum Role {
 }
 
 export interface ISocialUser {
+  id?: Types.ObjectId;
   username: string;
   password: string;
   nickname: string;

@@ -14,7 +14,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { KakaoAuthGuard } from './guards/kakao-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { TokenResponse } from './responses/token.response';
+import { TokenResponse } from './dto/responses/token.response';
 import { UnauthorizedExceptionFilter } from './filters/unauthorized-exception.filter';
 
 @Controller('auth')

@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Strategy } from 'passport-custom';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ISocialUser, Social } from '../interfaces/social-user.interface';
+import { Social } from '../interfaces/social-user.interface';
 
 @Injectable()
 export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
@@ -45,14 +45,12 @@ export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
 
       const profileData = await profileResponse.json();
 
-      const user: ISocialUser = {
+      return {
         password: profileData.id,
         nickname: profileData.properties.nickname,
         username: profileData.kakao_account.email,
         social: Social.KAKAO,
-      };
-
-      return user; // NestJS가 request.user로 사용할 수 있게 사용자 객체를 반환합니다.
+      }; // NestJS가 request.user로 사용할 수 있게 사용자 객체를 반환합니다.
     } catch (e) {
       throw new UnauthorizedException();
     }
