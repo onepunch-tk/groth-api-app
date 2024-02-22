@@ -1,9 +1,5 @@
 # env
 .env
-
-# user data dir
-src/__dev__
-
 # compiled output
 /dist
 /node_modules
