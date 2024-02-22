@@ -30,7 +30,7 @@ export class AuthController {
   async signInKakao() {
     const clientId = this.configService.get('KAKAO_CLIENT_ID');
     const redirectUri = this.configService.get('KAKAO_CALLBACK_URL');
-    const kakaoAuthUrl = `https://kauth.kakao.cogit m/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
     return { url: kakaoAuthUrl, statusCode: 302 };
   }
   @UseGuards(KakaoAuthGuard)
