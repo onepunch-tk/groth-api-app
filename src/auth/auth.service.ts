@@ -6,7 +6,7 @@ import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { TokenResponse } from './responses/token.response';
+import { TokenResponse } from './dto/responses/token.response';
 
 @Injectable()
 export class AuthService {

@@ -1,9 +1,11 @@
-import { Module, UnauthorizedException } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { APP_FILTER } from '@nestjs/core';
+import { InstagramModule } from './instagram/instagram.module';
+import { UnauthorizedExceptionFilter } from './auth/filters/unauthorized-exception.filter';
 
 @Module({
   imports: [
@@ -23,11 +25,12 @@ import { APP_FILTER } from '@nestjs/core';
       global: true,
     }),
     AuthModule,
+    InstagramModule,
   ],
   providers: [
     {
       provide: APP_FILTER,
-      useClass: UnauthorizedException,
+      useClass: UnauthorizedExceptionFilter,
     },
   ],
 })
