@@ -6,6 +6,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { APP_FILTER } from '@nestjs/core';
 import { InstagramModule } from './instagram/instagram.module';
 import { UnauthorizedExceptionFilter } from './auth/filters/unauthorized-exception.filter';
+import { S3Service } from './s3/s3.service';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { UnauthorizedExceptionFilter } from './auth/filters/unauthorized-excepti
       provide: APP_FILTER,
       useClass: UnauthorizedExceptionFilter,
     },
+    S3Service,
   ],
 })
 export class AppModule {}

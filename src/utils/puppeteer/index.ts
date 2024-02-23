@@ -6,13 +6,13 @@ import AdBlockerPlugin from 'puppeteer-extra-plugin-adblocker';
 import BlockResourcePlugin from 'puppeteer-extra-plugin-block-resources';
 import { BrowserProps } from './puppeteer.type';
 import { Browser, KnownDevices, Page } from 'puppeteer';
-import { getUserDataDir, isProduction } from '../index';
+import { getUserDataDirPath, isProduction } from '../index';
 
 export const createBrowser = async ({
   commands,
   configService,
   blockResources,
-  dirName,
+  dirPrefix,
   permission,
   username,
 }: BrowserProps) => {
@@ -26,8 +26,12 @@ export const createBrowser = async ({
   const production = isProduction(configService);
   const headless = production ? 'shell' : false;
 
-  if (dirName) {
-    const userDataDir = getUserDataDir(dirName, username, production);
+  if (dirPrefix) {
+    const userDataDir = `--user-data-dir=${getUserDataDirPath(
+      dirPrefix,
+      username,
+      production,
+    )}`;
     args.push(userDataDir);
   }
 
@@ -87,7 +91,7 @@ export const isSignedForInstagram = async (page: Page) => {
 
 export const waitFor = async (ms: number) => {
   // 3초(3000ms)와 5초(5000ms) 사이에서 랜덤한 시간(밀리초 단위)을 생성
-  const randomTime = Math.random() * (5000 - 3000) + 3000;
+  const randomTime = Math.random() * (5000 - 2000) + 2000;
 
   // 생성된 랜덤 시간을 기존 시간에 추가
   const totalTime = ms + randomTime;

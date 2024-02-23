@@ -11,12 +11,12 @@ type ChromiumCommandType =
   | '--disable-popup-blocking'
   | '--disable-accelerated-2d-canvas'
   | '--lang=en';
-type UserDataDirType = 'insta' | 'ytb' | 'coupang' | 'naver';
+export type UserDataDirType = 'insta' | 'ytb' | 'coupang' | 'naver';
 
 export type BrowserProps = {
   commands: ChromiumCommandType[];
   configService: ConfigService;
-  dirName?: UserDataDirType;
+  dirPrefix?: UserDataDirType;
   username?: string;
   blockResources: ResourceType[];
   permission?: {

@@ -12,6 +12,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Post } from './schemas/post.schema';
 import { PostStatus } from './interfaces/post.interface';
+import { S3Service } from '../s3/s3.service';
+import { UserDataDirType } from 'src/utils/puppeteer/puppeteer.type';
 
 @Injectable()
 export class InstagramService {
@@ -19,6 +21,7 @@ export class InstagramService {
   constructor(
     @InjectModel(Post.name) private postModel: Model<Post>,
     private readonly configService: ConfigService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async createPostSchedule(postDto: PostDto, requester: Types.ObjectId) {
@@ -38,7 +41,7 @@ export class InstagramService {
       };
     }
   }
-  async getBrowser(username: string) {
+  async getBrowser(dirName: UserDataDirType, username: string) {
     return createBrowser({
       commands: [
         '--disable-notifications',
@@ -48,7 +51,7 @@ export class InstagramService {
         '--no-sandbox',
       ],
       configService: this.configService,
-      dirName: 'insta',
+      dirPrefix: dirName,
       username,
       blockResources: [],
     });
@@ -63,13 +66,22 @@ export class InstagramService {
     const INSTA_URL = 'https://instagram.com/';
     let browser: Browser;
     let page: Page;
+    let localDir: string;
+
     try {
       const { username, password, isMobile, imgSrc, caption } =
         await this.postModel.findById(scheduleId);
-      browser = await this.getBrowser(username);
+
+      //aws s3 유저 데이터 directory 다운로드
+      localDir = await this.s3Service.downloadUserDataDir('insta', username);
+
+      //browser 및 page 생성
+      browser = await this.getBrowser('insta', username);
       page = await this.getPage(browser, isMobile);
+
       await page.goto(INSTA_LOGIN_URL, { waitUntil: 'networkidle2' });
 
+      //login form이 있을 경우 로그인 시도.
       if (await isSignedForInstagram(page)) {
         this.logger.log('need sign in.');
         const { statusCode, authenticated } = await this.signInByAccount(
@@ -91,25 +103,45 @@ export class InstagramService {
         }
       }
 
+      //인스타그램 홈으로 이동
       await page.goto(INSTA_URL);
       this.logger.log('go home');
       await waitFor(2500);
 
-      if (isMobile) {
-        //dialog cancel btn
-        this.logger.log('start mobile posting.');
+      //사용자 동의 dialog 창이 뜨면, 사용자 동의
+      try {
+        await page.waitForSelector(
+          'xpath/.//span[contains(text(), "I agree")]',
+          { timeout: 2000 },
+        );
+        const inputSwitchList = await page.$$('input[role=switch]');
+        if (inputSwitchList.length > 0) {
+          for (const inputEl of inputSwitchList) {
+            await inputEl.click();
+            await waitFor(100);
+          }
+        }
+        await waitFor(100);
+        await page.click("div[aria-label^='I agree']");
+        await waitFor(100);
+        await page.click("div[aria-label^='Close']");
+        await waitFor(100);
+      } catch (e) {
+        this.logger.error(e);
+      }
 
+      if (isMobile) {
+        this.logger.log('start mobile posting.');
         try {
           const cancelBtnEl = await page.waitForSelector(
             "xpath/.//button[contains(., 'Cancel')]",
             { timeout: 3000 },
           );
           await cancelBtnEl.click();
-          await waitFor(2000);
+          await waitFor(200);
         } catch (e) {
           this.logger.log('Not found Dialog');
         }
-
         await this.mobilePosting(page);
       } else {
         this.logger.log('start pc posting.');
@@ -125,7 +157,7 @@ export class InstagramService {
             timeout: 2000,
           });
           await nextBtnEl.click();
-          await waitFor(1500);
+          await waitFor(200);
         } catch (e) {
           postingWorker = false;
         }
@@ -140,7 +172,7 @@ export class InstagramService {
           );
           await inputEl.type(caption, { delay: 50 });
         }
-        await waitFor(1500);
+        await waitFor(150);
       }
 
       try {
@@ -148,7 +180,7 @@ export class InstagramService {
           "xpath/.//button[contains(text(), 'Share')]|.//div[contains(text(), 'Share')]";
         const shareBtnEl = await page.waitForSelector(shareBtnXpath);
         await shareBtnEl.click();
-        await waitFor(2000);
+        await waitFor(200);
         this.logger.log('posting success.');
       } catch (e) {
         await this.postModel.updateOne(
@@ -157,12 +189,16 @@ export class InstagramService {
         );
         this.logger.error('posting Failed');
       }
+
       await page.close();
       await browser.close();
+
       await this.postModel.updateOne(
         { _id: scheduleId },
         { status: PostStatus.SUCCESS },
       );
+      //작업이 완료되면 user data upload
+      await this.s3Service.uploadUserDataDir(localDir, username);
     } catch (e) {
       this.logger.error(e);
       page && (await page.close());
@@ -171,9 +207,10 @@ export class InstagramService {
         { _id: scheduleId },
         { status: PostStatus.FAILURE },
       );
-      return {
-        statusCode: e.status,
-      };
+    } finally {
+      if (localDir) {
+        await this.s3Service.deleteLocalUserDataDir(localDir);
+      }
     }
   }
   async signInByAccount(
@@ -210,7 +247,7 @@ export class InstagramService {
     const homeElements = await page.$$('[aria-label=Home]');
     const postingMenuBtn = homeElements[homeElements.length - 1];
     await postingMenuBtn.click();
-    await waitFor(1000);
+    await waitFor(200);
     try {
       const [fileChooser] = await Promise.all([
         page.waitForFileChooser(),
@@ -218,15 +255,10 @@ export class InstagramService {
       ]);
       await fileChooser.accept(['src/__dev__/file1.jpeg']);
       this.logger.log('fileChooser Accepted');
-      await waitFor(2500);
+      await waitFor(250);
     } catch (error) {
       // The chrome version may not support file picker interaction
       this.logger.error(error);
-      try {
-        await page.click("[aria-label='Post']");
-      } catch (err) {
-        this.logger.error(error);
-      }
     }
   }
 
@@ -240,7 +272,7 @@ export class InstagramService {
         'src/__dev__/file2.jpeg',
       );
       this.logger.log('upload images to input elements');
-      await waitFor(2500);
+      await waitFor(250);
     } catch (e) {
       this.logger.error(e);
     }
