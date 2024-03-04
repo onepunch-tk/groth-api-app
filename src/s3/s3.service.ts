@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as AWS from 'aws-sdk';
 import path from 'path';
 import * as fs from 'fs/promises';
 import { mkdir, readdir, readFile } from 'fs/promises';
@@ -17,19 +16,10 @@ import { Readable } from 'stream';
 
 @Injectable()
 export class S3Service {
-  private s3: AWS.S3;
   private s3Client: S3Client;
   private bucketName: string;
   private logger = new Logger(S3Service.name);
   constructor(private readonly configService: ConfigService) {
-    this.s3 = new AWS.S3({
-      credentials: {
-        accessKeyId: configService.get<string>('AWS_S3_ACCESS_KEY'),
-        secretAccessKey: configService.get<string>('AWS_S3_SECRET_KEY'),
-      },
-      region: configService.get<string>('AWS_S3_REGION'),
-    });
-
     this.s3Client = new S3Client({
       credentials: {
         accessKeyId: configService.get<string>('AWS_S3_ACCESS_KEY'),

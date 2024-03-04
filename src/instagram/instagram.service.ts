@@ -1,5 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import puppeteer from 'puppeteer-extra';
+
 import {
   createBrowser,
   createPage,
@@ -14,6 +16,9 @@ import { Post } from './schemas/post.schema';
 import { PostStatus } from './interfaces/post.interface';
 import { S3Service } from '../s3/s3.service';
 import { UserDataDirType } from 'src/utils/puppeteer/puppeteer.type';
+import { randomInt } from 'crypto';
+import sharp from 'sharp';
+import axios from 'axios';
 
 @Injectable()
 export class InstagramService {
@@ -41,7 +46,7 @@ export class InstagramService {
       };
     }
   }
-  async getBrowser(dirName: UserDataDirType, username: string) {
+  private async getBrowser(dirName: UserDataDirType, username: string) {
     return createBrowser({
       commands: [
         '--disable-notifications',
@@ -57,7 +62,7 @@ export class InstagramService {
     });
   }
 
-  async getPage(browser: Browser, isMobile: boolean) {
+  private async getPage(browser: Browser, isMobile: boolean) {
     return createPage(browser, isMobile);
   }
   async posting(scheduleId: Types.ObjectId) {
@@ -142,10 +147,10 @@ export class InstagramService {
         } catch (e) {
           this.logger.log('Not found Dialog');
         }
-        await this.mobilePosting(page);
+        await this.mobilePosting(page, [imgSrc]);
       } else {
         this.logger.log('start pc posting.');
-        await this.pcPosting(page);
+        await this.pcPosting(page, [imgSrc]);
       }
 
       const nextBtnXpath =
@@ -243,7 +248,7 @@ export class InstagramService {
     }
   }
 
-  private async mobilePosting(page: Page) {
+  private async mobilePosting(page: Page, imgSrc: string[]) {
     const homeElements = await page.$$('[aria-label=Home]');
     const postingMenuBtn = homeElements[homeElements.length - 1];
     await postingMenuBtn.click();
@@ -253,7 +258,7 @@ export class InstagramService {
         page.waitForFileChooser(),
         page.click("[aria-label='Post']"),
       ]);
-      await fileChooser.accept(['src/__dev__/file1.jpeg']);
+      await fileChooser.accept(imgSrc);
       this.logger.log('fileChooser Accepted');
       await waitFor(250);
     } catch (error) {
@@ -262,19 +267,82 @@ export class InstagramService {
     }
   }
 
-  private async pcPosting(page: Page) {
+  private async pcPosting(page: Page, imgSrc: string[]) {
     try {
       const createBtn = await page.waitForSelector('[aria-label^="New post"]');
       await createBtn.click();
       const inputEl = await page.waitForSelector('input[type=file]');
-      await inputEl.uploadFile(
-        'src/__dev__/file1.jpeg',
-        'src/__dev__/file2.jpeg',
-      );
+      await inputEl.uploadFile(...imgSrc);
       this.logger.log('upload images to input elements');
       await waitFor(250);
     } catch (e) {
       this.logger.error(e);
     }
+  }
+
+  async createPostImg() {
+    let browser: Browser;
+    let page: Page;
+    try {
+      const UN_SPLASH_URL = 'https://unsplash.com';
+      browser = await puppeteer.launch({ headless: false });
+      page = await browser.newPage();
+      await page.goto(UN_SPLASH_URL);
+      // `href` 속성이 "/t/"로 시작하는 모든 `a` 태그의 `href` 값을 배열로 수집합니다.
+      const hrefValues = await page.$$eval('a[href^="/t/"]', (anchors) =>
+        anchors.map((anchor) => anchor.getAttribute('href')),
+      );
+      // hrefValues 배열의 길이를 확인하고, 0부터 길이 - 1까지의 랜덤 인덱스를 생성합니다.
+      const randomIndex = Math.floor(Math.random() * hrefValues.length);
+      await page.goto(UN_SPLASH_URL + hrefValues[randomIndex]);
+
+      // src 속성을 가져옵니다 (실제 셀렉터로 교체해야 함)
+      const imgSrc = await page.$eval('img[srcset]', (img) => img.src);
+      const response = await axios.get(imgSrc, { responseType: 'arraybuffer' });
+      const originalImage: ArrayBuffer = response.data;
+
+      await page.close();
+      await browser.close();
+
+      return await this.resizeImageForInstagram(originalImage);
+    } catch (e) {
+      page && (await page.close());
+      browser && (await browser.close());
+      return '';
+    }
+  }
+
+  private async resizeImageForInstagram(originalImage: ArrayBuffer) {
+    const outputPath = 'src/__dev__/image.jpg';
+    // 1~5px 사이의 랜덤 값을 생성
+    const cropWidth = randomInt(1, 6);
+    const cropHeight = randomInt(1, 6);
+
+    // 밝기와 채도를 0.9~1.2 사이의 랜덤 값으로 설정
+    const brightness = Math.random() * (1.2 - 0.9) + 0.9;
+    const saturation = Math.random() * (1.2 - 0.9) + 0.9;
+
+    const image = sharp(originalImage)
+      .resize({
+        width: 1080,
+        height: 1350,
+        fit: 'cover', // 중요한 부분이 잘리지 않도록 조정
+      })
+      // 랜덤하게 잘라낸 값을 적용하여 이미지를 잘라냄
+      .extract({
+        left: cropWidth,
+        top: cropHeight,
+        width: 1080 - cropWidth,
+        height: 1350 - cropHeight,
+      })
+      // 밝기와 채도를 조정
+      .modulate({
+        brightness: brightness,
+        saturation: saturation,
+      });
+
+    // 조정된 이미지를 파일로 저장
+    await image.toFile(outputPath);
+    return outputPath;
   }
 }
